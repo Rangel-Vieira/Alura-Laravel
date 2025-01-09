@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SeriesCreated;
 use App\Http\Requests\SeriesFormRequest;
 use App\Models\Series;
 use App\Repositories\SeriesRepository;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class SeriesController extends Controller
 {
@@ -28,13 +30,25 @@ class SeriesController extends Controller
 
     public function store(SeriesFormRequest $request){
         
+        $coverPath = $request->hasFile('cover') 
+            ? $request->file('cover')->store('series_cover', 'public') 
+            : null;
+        $request->coverPath = $coverPath;
+        
         $serie = $this->seriesRepository->add($request);
+        SeriesCreated::dispatch(
+            $serie->nome,
+            $serie->id,
+            $request->seasonsQty,
+            $request->episodesPerSeason
+        );
 
         return to_route('series.index')
             ->with('mensagem.sucesso', "Série '$serie->nome' criada com sucesso");
     }
 
     public function destroy(Series $series){
+        Storage::delete($series->cover);
         $series->delete();
 
         return to_route('series.index')
